@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>智慧论文伴侣</title>
+  <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/dompurify@3.0.6/dist/purify.min.js"></script>
+
+  <style>
+    :root {
+      --primary-color: #42b883; --secondary-color: #35495e; --background-color: #f4f6f8; --card-background-color: #ffffff; --text-color: #2c3e50; --border-color: #e0e0e0; --error-color: #e53935; --user-message-bg: #e1f5fe; --assistant-message-bg: #f1f3f4;
+    }
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; color: var(--text-color); background-color: var(--background-color); margin: 0; padding: 20px; -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; }
+    #app-container { max-width: 900px; margin: 0 auto; }
+    .app-header { text-align: center; margin-bottom: 30px; }
+    .app-header h1 { color: var(--secondary-color); font-size: 2.5em; margin: 0; }
+    .subtitle { color: #6c757d; font-size: 1.1em; }
+    .card { background: var(--card-background-color); border-radius: 8px; padding: 25px; margin-bottom: 25px; box-shadow: 0 4px 12px rgba(0,0,0,0.08); border: 1px solid var(--border-color); }
+    .form-group { margin-bottom: 20px; }
+    .form-group label { display: block; font-weight: 600; margin-bottom: 8px; color: var(--secondary-color); }
+    .file-input, .text-input, .select-input { width: 100%; padding: 12px; border-radius: 6px; border: 1px solid var(--border-color); font-size: 1em; box-sizing: border-box; transition: border-color 0.3s, box-shadow 0.3s; }
+    .file-input { padding: 8px; }
+    .text-input:focus, .select-input:focus { outline: none; border-color: var(--primary-color); box-shadow: 0 0 0 3px rgba(66, 184, 131, 0.2); }
+    .action-button, .send-button { width: 100%; padding: 12px 20px; font-size: 1.1em; font-weight: 600; color: white; background: linear-gradient(45deg, var(--primary-color), #27a070); border: none; border-radius: 6px; cursor: pointer; transition: transform 0.2s, box-shadow 0.2s; display: flex; justify-content: center; align-items: center; }
+    .action-button:hover:not(:disabled) { transform: translateY(-2px); box-shadow: 0 6px 15px rgba(66, 184, 131, 0.4); }
+    .action-button:disabled, .send-button:disabled { background: #a5d6a7; cursor: not-allowed; }
+    .error-message { color: var(--error-color); margin-top: 15px; font-weight: 500; display: none; }
+    .results-section { display: none; }
+    .chat-history { height: 400px; overflow-y: auto; border: 1px solid var(--border-color); border-radius: 6px; padding: 15px; margin-bottom: 15px; display: flex; flex-direction: column; gap: 15px; }
+    .message { display: flex; flex-direction: column; }
+    .message-bubble { max-width: 80%; padding: 12px 18px; border-radius: 18px; line-height: 1.5; word-wrap: break-word; }
+    .message.user { align-items: flex-end; }
+    .message.user .message-bubble { background-color: var(--user-message-bg); color: #01579b; border-top-right-radius: 4px; }
+    .message.assistant { align-items: flex-start; }
+    .message.assistant .message-bubble { background-color: var(--assistant-message-bg); border-top-left-radius: 4px; }
+    .chat-input-form { display: flex; gap: 10px; }
+    .chat-input { flex-grow: 1; }
+    .send-button { width: auto; padding: 12px 25px; }
+    .markdown-content { background-color: var(--background-color); padding: 20px; border-radius: 6px; line-height: 1.7; }
+    .markdown-content > *:first-child, .message-bubble > *:first-child { margin-top: 0; }
+    .markdown-content > *:last-child, .message-bubble > *:last-child { margin-bottom: 0; }
+    .markdown-content h1, .markdown-content h2, .markdown-content h3,
+    .message-bubble h1, .message-bubble h2, .message-bubble h3,
+    .markdown-content strong, .message-bubble strong { color: var(--secondary-color); }
+    .markdown-content ul, .markdown-content ol,
+    .message-bubble ul, .message-bubble ol { padding-left: 25px; margin-bottom: 1em; }
+    .markdown-content p, .message-bubble p { margin-bottom: 1em; }
+    .markdown-content code, .message-bubble code { background-color: rgba(0,0,0,0.05); padding: 0.2em 0.4em; border-radius: 3px; font-family: 'Courier New', Courier, monospace; }
+    .markdown-content pre, .message-bubble pre { background-color: #2d2d2d; color: #f1f1f1; padding: 1em; border-radius: 5px; overflow-x: auto; }
+    .markdown-content pre code, .message-bubble pre code { background-color: transparent; padding: 0; }
+    
+    .copy-button { align-self: flex-start; background-color: #e0e0e0; border: none; color: #555; padding: 4px 10px; font-size: 12px; border-radius: 4px; cursor: pointer; opacity: 0.3; transition: opacity 0.2s, background-color 0.2s; margin-top: 8px; margin-left: 10px; }
+    .summary-section .copy-button { align-self: flex-end; margin: 0; }
+    .message.assistant:hover .copy-button,
+    .summary-section:hover .copy-button { opacity: 1; }
+    .copy-button:hover { background-color: #c7c7c7; }
+    .copy-button:active { background-color: var(--primary-color); color: white; }
+  </style>
+</head>
+<body>
+
+  <div id="app-container">
+    <header class="app-header"><h1>智慧论文伴侣</h1><p class="subtitle">上传PDF，即刻总结，深度问答</p></header>
+    <main class="main-content">
+      <section class="config-section card">
+        <h2>1. 配置</h2>
+        <div class="form-group"><label for="pdf-upload">上传论文 (PDF)</label><input id="pdf-upload" type="file" accept=".pdf" class="file-input"></div>
+        <div class="form-group"><label for="api-key">API Key</label><input id="api-key" type="password" placeholder="请输入您的 DeepSeek API Key" class="text-input"></div>
+        <div class="form-group"><label for="model-select">选择模型</label><select id="model-select" class="select-input"><option value="deepseek-chat">DeepSeek V3.2 (Deepseek-chat)</option><option value="deepseek-coder">DeepSeek R1(DeepSeek-Reasoner)</option></select></div>
+        <button id="summarize-btn" class="action-button"><span id="summarize-btn-text">开始总结</span></button>
+        <p id="error-message" class="error-message"></p>
+      </section>
+      <section id="results-section" class="results-section">
+        <div class="summary-section card">
+          <div class="summary-header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+            <h2>2. 论文总结</h2>
+          </div>
+          <div id="summary-content" class="markdown-content"></div>
+        </div>
+        <div class="chat-section card">
+          <h2>3. 论文问答</h2>
+          <div id="chat-history" class="chat-history"></div>
+          <form id="chat-form" class="chat-input-form">
+            <input id="chat-input" type="text" placeholder="针对论文内容进行提问..." class="chat-input text-input">
+            <button id="send-btn" type="submit" class="send-button"><span id="send-btn-text">发送</span></button>
+          </form>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <script>
+    const pdfUpload = document.getElementById('pdf-upload'), apiKeyInput = document.getElementById('api-key'), modelSelect = document.getElementById('model-select'), summarizeBtn = document.getElementById('summarize-btn'), summarizeBtnText = document.getElementById('summarize-btn-text'), errorMessage = document.getElementById('error-message'), resultsSection = document.getElementById('results-section'), summaryContent = document.getElementById('summary-content'), chatHistory = document.getElementById('chat-history'), chatForm = document.getElementById('chat-form'), chatInput = document.getElementById('chat-input'), sendBtn = document.getElementById('send-btn'), sendBtnText = document.getElementById('send-btn-text'), summaryHeader = document.querySelector('.summary-header');
+    let pdfFile = null;
+
+    pdfUpload.addEventListener('change', e => { const t = e.target.files[0]; t && "application/pdf" === t.type ? (pdfFile = t, showError("")) : (pdfFile = null, showError("请选择一个有效的 PDF 文件。")) });
+    
+    summarizeBtn.addEventListener('click', async () => { 
+        if (!pdfFile || !apiKeyInput.value) return showError("请确保已选择 PDF 文件并输入了 API Key。"); 
+        toggleSummarizeLoading(!0, "正在上传并分析..."); 
+        showError(""); 
+        resultsSection.style.display = "none"; 
+        const e = new FormData; 
+        e.append("pdf_file", pdfFile); 
+        try { 
+            const t = await fetch("http://127.0.0.1:8000/summarize", { 
+                method: "POST", 
+                headers: { "x-api-key": apiKeyInput.value, "x-model-name": modelSelect.value }, 
+                body: e 
+            });
+            const s = await t.json(); 
+            if (!t.ok) throw new Error(s.detail || "处理失败"); 
+            const a = marked.parse(s.summary); 
+            summaryContent.innerHTML = DOMPurify.sanitize(a); 
+            const n = summaryHeader.querySelector(".copy-button"); 
+            n && n.remove(); 
+            const o = createCopyButton(s.summary); 
+            summaryHeader.appendChild(o); 
+            resultsSection.style.display = "block"; 
+            clearChatHistory(); 
+            addMessageToChat("assistant", "论文总结完成！现在您可以就论文内容向我提问了。") 
+        } catch (e) { 
+            showError(`错误: ${e.message}`) 
+        } finally { 
+            toggleSummarizeLoading(!1) 
+        } 
+    });
+
+    chatForm.addEventListener('submit', async e => { 
+        e.preventDefault(); 
+        const t = chatInput.value.trim(); 
+        if (!t) return; 
+        addMessageToChat("user", t); 
+        chatInput.value = ""; 
+        toggleSendLoading(!0); 
+        try { 
+            const e = await fetch("http://127.0.0.1:8000/ask", { 
+                method: "POST", 
+                headers: { "Content-Type": "application/json", "x-api-key": apiKeyInput.value, "x-model-name": modelSelect.value }, 
+                body: JSON.stringify({ question: t }) 
+            });
+            const s = await e.json(); 
+            if (!e.ok) throw new Error(s.detail || "回答失败"); 
+            addMessageToChat("assistant", s.answer) 
+        } catch (e) { 
+            addMessageToChat("assistant", `抱歉，出现错误: ${e.message}`) 
+        } finally { 
+            toggleSendLoading(!1) 
+        } 
+    });
+    
+    function createCopyButton(textToCopy) {
+        const button = document.createElement("button");
+        button.className = "copy-button";
+        button.textContent = "复制 Markdown";
+        button.addEventListener("click", () => {
+            navigator.clipboard.writeText(textToCopy).then(() => {
+                button.textContent = "已复制!";
+                setTimeout(() => { button.textContent = "复制 Markdown" }, 2e3)
+            }).catch(e => {
+                console.error("复制失败:", e);
+                button.textContent = "复制失败";
+                setTimeout(() => { button.textContent = "复制 Markdown" }, 2e3)
+            })
+        });
+        return button
+    }
+    
+    function addMessageToChat(role, content) {
+        const messageDiv = document.createElement("div");
+        messageDiv.className = `message ${role}`;
+        const bubbleDiv = document.createElement("div");
+        bubbleDiv.className = "message-bubble";
+        const unsafeHtml = marked.parse(content);
+        bubbleDiv.innerHTML = DOMPurify.sanitize(unsafeHtml);
+        messageDiv.appendChild(bubbleDiv);
+        if ("assistant" === role) {
+            const copyBtn = createCopyButton(content);
+            messageDiv.appendChild(copyBtn)
+        }
+        chatHistory.appendChild(messageDiv);
+        chatHistory.scrollTop = chatHistory.scrollHeight
+    }
+
+    function showError(e) { errorMessage.textContent = e; errorMessage.style.display = e ? "block" : "none" }
+    function toggleSummarizeLoading(e, t = "开始总结") { summarizeBtn.disabled = e; summarizeBtnText.textContent = t }
+    function toggleSendLoading(e, t = "发送") { sendBtn.disabled = e; chatInput.disabled = e; sendBtnText.textContent = e ? "思考中..." : "发送" }
+    function clearChatHistory() { chatHistory.innerHTML = "" }
+  </script>
+
+</body>
+</html>
